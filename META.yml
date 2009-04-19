@@ -1,0 +1,12 @@
+--- 
+abstract: GitHub Command Tools
+author: 
+  - Fayland Lam <fayland@gmail.com>
+generated_by: Dist::Zilla::Plugin::MetaYaml version 1.006
+license: perl
+name: App-GitHub
+requires: 
+  JSON::XS: 2.232
+  Net::GitHub: 0.08
+  Term::ReadLine: 0
+version: 0.01

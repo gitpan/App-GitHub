@@ -1,0 +1,9 @@
+Changes
+LICENSE
+MANIFEST
+META.yml
+Makefile.PL
+README
+bin/github.pl
+dist.ini
+lib/App/GitHub.pm
