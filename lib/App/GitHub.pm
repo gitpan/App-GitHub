@@ -10,28 +10,40 @@ use Net::GitHub;
 use Term::ReadLine;
 use JSON::XS;
 
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 
+# Copied from Devel-REPL
 has 'term' => (
-    is      => 'ro',
-    isa     => 'Object',
-    default => sub {
-        my $term = new Term::ReadLine 'github';
-
-        my $odef = select STDERR;
-        $| = 1;
-        select STDOUT;
-        $| = 1;
-        select $odef;
-
-        return $term;
-    }
+    is       => 'rw',
+    required => 1,
+    default  => sub { Term::ReadLine->new('Perl-App-GitHub') }
 );
 has 'prompt' => (
-    is      => 'rw',
-    isa     => 'Str',
-    default => "github> ",
+    is       => 'rw',
+    required => 1,
+    default  => sub { 'github> ' }
 );
+
+has 'out_fh' => (
+    is       => 'rw',
+    required => 1,
+    lazy     => 1,
+    default  => sub { shift->term->OUT || \*STDOUT; }
+);
+
+sub print {
+    my ( $self, @ret ) = @_;
+    my $fh = $self->out_fh;
+    no warnings 'uninitialized';
+    print $fh "@ret";
+    print $fh "\n" if $self->term->ReadLine =~ /Gnu/;
+}
+
+sub read {
+    my ( $self, $prompt ) = @_;
+    $prompt ||= $self->prompt;
+    return $self->term->readline($prompt);
+}
 
 has 'github' => (
     is  => 'rw',
@@ -48,68 +60,71 @@ my $dispatch = {
     'h'    => \&help,
 
     # Common
-    repo  => \&set_repo,
-    login => \&set_login,
+    repo    => \&set_repo,
+    login   => \&set_login,
+    loadcfg => \&set_loadcfg,
 
     # Repo
     rshow    => \&repo_show,
     rlist    => \&repo_list,
     findrepo => sub {
         my ( $self, $word ) = @_;
-        $self->run_github("repos->search('$word')");
+        $self->run_github( 'repos', 'search', $word );
     },
-    watch       => sub { shift->run_github('repos->watch()'); },
-    unwatch     => sub { shift->run_github('repos->unwatch()'); },
-    fork        => sub { shift->run_github('repos->fork()'); },
+    watch       => sub { shift->run_github( 'repos', 'watch' ); },
+    unwatch     => sub { shift->run_github( 'repos', 'unwatch' ); },
+    fork        => sub { shift->run_github( 'repos', 'fork' ); },
     create      => \&repo_create,
     delete      => \&repo_delete,
-    set_private => sub { shift->run_github('repos->set_private()'); },
-    set_public  => sub { shift->run_github('repos->set_public()'); },
+    set_private => sub { shift->run_github( 'repos', 'set_private' ); },
+    set_public  => sub { shift->run_github( 'repos', 'set_public' ); },
 
     # XXX? TODO, deploy_keys collaborators
-    network  => sub { shift->run_github('repos->network()'); },
-    tags     => sub { shift->run_github('repos->tags()'); },
-    branches => sub { shift->run_github('repos->branches()'); },
+    network  => sub { shift->run_github( 'repos', 'network' ); },
+    tags     => sub { shift->run_github( 'repos', 'tags' ); },
+    branches => sub { shift->run_github( 'repos', 'branches' ); },
 
     # Issues
     ilist => sub {
         my ( $self, $type ) = @_;
         $type ||= 'open';
-        $self->run_github("issue->list('$type')");
+        $self->run_github( 'issue', 'list', $type );
     },
     iview => sub {
         my ( $self, $number ) = @_;
-        $self->run_github("issue->view($number)");
+        $self->run_github( 'issue', 'view', $number );
     },
     iopen  => \&issue_open,
     iclose => sub {
         my ( $self, $number ) = @_;
-        $self->run_github("issue->close($number)");
+        $self->run_github( 'issue', 'close', $number );
     },
     ireopen => sub {
         my ( $self, $number ) = @_;
-        $self->run_github("issue->reopen($number)");
+        $self->run_github( 'issue', 'reopen', $number );
     },
 
     # XXX? TODO, add_label, edit etc
+    ilabel => \&issue_label,
 
     # File/Path
     cd => sub {
-        eval( "chdir " . shift );
-        print $@ if $@;
+        my ( $self, $args ) = @_;
+        eval("chdir $args");
+        $self->print($@) if $@;
     },
 };
 
 sub run {
     my $self = shift;
 
-    print <<START;
+    $self->print(<<START);
 
 Welcome to GitHub Command Tools! (Ver: $VERSION)
 Type '?' or 'h' for help.
 START
 
-    while ( defined( my $command = $self->term->readline( $self->prompt ) ) ) {
+    while ( defined( my $command = $self->read ) ) {
 
         $command =~ s/(^\s+|\s+$)//g;
         next unless length($command);
@@ -126,7 +141,7 @@ START
                 $dispatch->{$command}->( $self, $args );
             }
             else {
-                print "Unknown command, type '?' or 'h' for help\n";
+                $self->print("Unknown command, type '?' or 'h' for help");
                 next unless $command;
             }
         }
@@ -136,12 +151,14 @@ START
 }
 
 sub help {
-    print <<HELP;
+    my $self = shift;
+    $self->print(<<HELP);
  command  argument          description
  repo     :user :repo       set owner/repo, eg: 'fayland perl-app-github'
  login    :login :token     authenticated as :login
+ loadcfg                    authed by git config --global github.user|token
  ?,h                        help
- q,exit,quit                  exit
+ q,exit,quit                exit
 
 Repos
  rshow                      more in-depth information for the :repo in repo
@@ -164,13 +181,15 @@ Issues
  iopen                      open a new issue (authentication required)
  iclose   :number           close an issue (authentication required)
  ireopen  :number           reopen an issue (authentication required)
+ ilabel   add|remove :num :label
+                            add/remove a label (authentication required)
 
 File/Path related
  cd       PATH              chdir to PATH
 
 Others
- show     :user :repo       more in-depth information for a repository
- list     :user             list out all the repositories for a user
+ rshow    :user :repo       more in-depth information for a repository
+ rlist    :user             list out all the repositories for a user
 HELP
 }
 
@@ -179,7 +198,7 @@ sub set_repo {
 
     # validate
     unless ( $repo =~ /^([\-\w]+)[\/\\\s]([\-\w]+)$/ ) {
-        print "Wrong repo args ($repo), eg fayland/perl-app-github\n";
+        $self->print("Wrong repo args ($repo), eg fayland/perl-app-github");
         return;
     }
     my ( $owner, $name ) = ( $repo =~ /^([\-\w]+)[\/\\\s]([\-\w]+)$/ );
@@ -207,10 +226,32 @@ sub set_login {
 
     ( $login, my $token ) = split( /\s+/, $login, 2 );
     unless ( $login and $token ) {
-        print
-"Wrong login args ($login $token), eg fayland 54b5197d7f92f52abc5c7149b313cf51\n";
+        $self->print(
+"Wrong login args ($login $token), eg fayland 54b5197d7f92f52abc5c7149b313cf51"
+        );
         return;
     }
+
+    $self->_do_login( $login, $token );
+}
+
+sub set_loadcfg {
+    my ($self) = @_;
+
+    my $login = `git config --global github.user`;
+    my $token = `git config --global github.token`;
+    chomp($login);
+    chomp($token);
+    unless ( $login and $token ) {
+        $self->print("run git config --global github.user|token fails");
+        return;
+    }
+
+    $self->_do_login( $login, $token );
+}
+
+sub _do_login {
+    my ( $self, $login, $token ) = @_;
 
     # save for set_repo
     $self->{_data}->{login} = $login;
@@ -227,29 +268,34 @@ sub set_login {
 }
 
 sub run_github {
-    my ( $self, $command ) = @_;
+    my ( $self, $c1, $c2 ) = @_;
+    my @args = splice( @_, 3, scalar @_ - 3 );
 
     unless ( $self->github ) {
-        print <<'ERR';
-unknown repo. try 'repo :owner/:repo' first
+        $self->print(<<'ERR');
+unknown repo. try 'repo :owner :repo' first
 ERR
         return;
     }
 
-    eval(
-qq~print JSON::XS->new->utf8->pretty->encode(\$self->github->$command) . "\n"~
-    );
+    eval {
+        $self->print(
+            JSON::XS->new->utf8->pretty->encode(
+                $self->github->$c1->$c2(@args)
+            )
+        );
+    };
 
     if ($@) {
 
         # custom error
         if ( $@ =~ /login and token are required/ ) {
-            print <<'ERR';
+            $self->print(<<'ERR');
 authentication required. try 'login :owner :token' first
 ERR
         }
         else {
-            print $@;
+            $self->print($@);
         }
     }
 }
@@ -258,20 +304,20 @@ ERR
 sub repo_show {
     my ( $self, $args ) = @_;
     if ( $args and $args =~ /^([\-\w]+)[\/\\\s]([\-\w]+)$/ ) {
-        $self->run_github("repos->show('$1', '$2')");
+        $self->run_github( 'repos', 'show', $1, $2 );
     }
     else {
-        $self->run_github('repos->show()');
+        $self->run_github( 'repos', 'show' );
     }
 }
 
 sub repo_list {
     my ( $self, $args ) = @_;
     if ( $args and $args =~ /^[\w\-]+$/ ) {
-        $self->run_github("repos->list('$args')");
+        $self->run_github( 'repos', 'list', $args );
     }
     else {
-        $self->run_github('repos->list()');
+        $self->run_github( 'repos', 'list' );
     }
 }
 
@@ -280,28 +326,25 @@ sub repo_create {
 
     my %data;
     foreach my $col ( 'name', 'desc', 'homepage' ) {
-        my $data = $self->term->readline( ucfirst($col) . ': ' );
+        my $data = $self->read( ucfirst($col) . ': ' );
         $data{$col} = $data;
     }
     unless ( length( $data{name} ) ) {
-        print <<'ERR';
-create repo failed. name is required
-ERR
+        $self->print('create repo failed. name is required');
         return;
     }
 
-    $self->run_github(
-        qq~repos->create( "$data{name}", "$data{desc}", "$data{homepage}", 1 )~
-    );
+    $self->run_github( 'repos', 'create', $data{name}, $data{desc},
+        $data{homepage}, 1 );
 }
 
 sub repo_del {
     my ($self) = @_;
 
-    my $data = $self->term->readline('Are you sure to delete the repo? [YN]? ');
+    my $data = $self->read('Are you sure to delete the repo? [YN]? ');
     if ( $data eq 'Y' ) {
-        print "Deleting Repos ...\n";
-        $self->run_github("repos->delete( { confirm => 1 } )");
+        $self->print("Deleting Repos ...");
+        $self->run_github( 'repos', 'delete', { confirm => 1 } );
     }
 }
 
@@ -309,13 +352,26 @@ sub repo_del {
 sub issue_open {
     my ($self) = @_;
 
-    my %data;
-    foreach my $col ( 'title', 'body' ) {
-        my $data = $self->term->readline( ucfirst($col) . ': ' );
-        $data{$col} = $data;
-    }
+    my $title = $self->read('Title: ');
+    my $body  = $self->read('Body: ');
 
-    $self->run_github(qq~issue->open( "$data{title}", "$data{body}" )~);
+    $self->run_github( 'issue', 'open', $title, $body );
+}
+
+sub issue_label {
+    my ( $self, $args ) = @_;
+
+    no warnings 'uninitialized';
+    my ( $type, $number, $label ) = split( /\s+/, $args, 3 );
+    if ( $type eq 'add' ) {
+        $self->run_github( 'issue', 'add_label', $number, $label );
+    }
+    elsif ( $type eq 'remove' ) {
+        $self->run_github( 'issue', 'remove_label', $number, $label );
+    }
+    else {
+        $self->print('unknown argument. ilabel add|remove :number :label');
+    }
 }
 
 1;
@@ -327,7 +383,7 @@ App::GitHub - GitHub Command Tools
 
 =head1 VERSION
 
-version 0.02
+version 0.03
 
 =head1 SYNOPSIS
 
