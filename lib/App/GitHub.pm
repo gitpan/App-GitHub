@@ -10,7 +10,7 @@ use Net::GitHub;
 use Term::ReadLine;
 use JSON::XS;
 
-our $VERSION = '0.03';
+our $VERSION = '0.04';
 
 # Copied from Devel-REPL
 has 'term' => (
@@ -94,7 +94,8 @@ my $dispatch = {
         my ( $self, $number ) = @_;
         $self->run_github( 'issue', 'view', $number );
     },
-    iopen  => \&issue_open,
+    iopen => sub { shift->issue_open_or_edit('open') },
+    iedit => sub { shift->issue_open_or_edit( 'edit', @_ ) },
     iclose => sub {
         my ( $self, $number ) = @_;
         $self->run_github( 'issue', 'close', $number );
@@ -181,6 +182,7 @@ Issues
  iopen                      open a new issue (authentication required)
  iclose   :number           close an issue (authentication required)
  ireopen  :number           reopen an issue (authentication required)
+ iedit    :number           edit an issue (authentication required)
  ilabel   add|remove :num :label
                             add/remove a label (authentication required)
 
@@ -269,15 +271,13 @@ sub _do_login {
 
 sub run_github {
     my ( $self, $c1, $c2 ) = @_;
-    my @args = splice( @_, 3, scalar @_ - 3 );
 
     unless ( $self->github ) {
-        $self->print(<<'ERR');
-unknown repo. try 'repo :owner :repo' first
-ERR
+        $self->print(q~unknown repo. try 'repo :owner :repo' first~);
         return;
     }
 
+    my @args = splice( @_, 3, scalar @_ - 3 );
     eval {
         $self->print(
             JSON::XS->new->utf8->pretty->encode(
@@ -290,9 +290,9 @@ ERR
 
         # custom error
         if ( $@ =~ /login and token are required/ ) {
-            $self->print(<<'ERR');
-authentication required. try 'login :owner :token' first
-ERR
+            $self->print(
+qq~authentication required.\ntry 'login :owner :token' or 'loadcfg' first\n~
+            );
         }
         else {
             $self->print($@);
@@ -349,13 +349,28 @@ sub repo_del {
 }
 
 # Issues
-sub issue_open {
-    my ($self) = @_;
+sub issue_open_or_edit {
+    my ( $self, $type, $number ) = @_;
+
+    if ( $type eq 'edit' and $number !~ /^\d+$/ ) {
+        $self->print('unknown argument. iedit :number');
+        return;
+    }
 
     my $title = $self->read('Title: ');
-    my $body  = $self->read('Body: ');
+    my $body  = $self->read('Body (use EOF to submit, use QUIT to cancel): ');
+    while ( my $data = $self->read('> ') ) {
+        last   if ( $data eq 'EOF' );
+        return if ( $data eq 'QUIT' );
+        $body .= "\n" . $data;
+    }
 
-    $self->run_github( 'issue', 'open', $title, $body );
+    if ( $type eq 'edit' ) {
+        $self->run_github( 'issue', 'edit', $number, $title, $body );
+    }
+    else {
+        $self->run_github( 'issue', 'open', $title, $body );
+    }
 }
 
 sub issue_label {
@@ -383,7 +398,7 @@ App::GitHub - GitHub Command Tools
 
 =head1 VERSION
 
-version 0.03
+version 0.04
 
 =head1 SYNOPSIS
 
