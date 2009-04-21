@@ -7,3 +7,4 @@ README
 bin/github.pl
 dist.ini
 lib/App/GitHub.pm
+t/00-load.t

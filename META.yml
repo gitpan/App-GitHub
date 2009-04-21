@@ -7,6 +7,9 @@ license: perl
 name: App-GitHub
 requires: 
   JSON::XS: 2.232
-  Net::GitHub: 0.08
+  Moose: 0
+  Net::GitHub: 0.09
   Term::ReadLine: 0
-version: 0.04
+resources: 
+  repository: git://github.com/fayland/perl-app-github.git
+version: 0.05
