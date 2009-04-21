@@ -10,7 +10,7 @@ use Net::GitHub;
 use Term::ReadLine;
 use JSON::XS;
 
-our $VERSION = '0.08';
+our $VERSION = '0.09';
 
 has 'term' => (
     is       => 'rw',
@@ -334,11 +334,13 @@ sub run_github {
 
     my @args = splice( @_, 3, scalar @_ - 3 );
     eval {
-        $self->print(
-            JSON::XS->new->utf8->pretty->encode(
-                $self->github->$c1->$c2(@args)
-            )
-        );
+        my $result = $self->github->$c1->$c2(@args);
+
+        # o.raw return plain text
+        if ( ref $result ) {
+            $result = JSON::XS->new->utf8->pretty->encode($result);
+        }
+        $self->print($result);
     };
 
     if ($@) {
@@ -511,7 +513,7 @@ App::GitHub - GitHub Command Tools
 
 =head1 VERSION
 
-version 0.08
+version 0.09
 
 =head1 SYNOPSIS
 

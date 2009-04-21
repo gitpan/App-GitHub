@@ -9,7 +9,7 @@ WriteMakefile(
   NAME      => 'App::GitHub',
   AUTHOR    => 'Fayland\ Lam\ \<fayland\@gmail\.com\>',
   ABSTRACT  => 'GitHub Command Tools',
-  VERSION   => '0.08',
+  VERSION   => '0.09',
   EXE_FILES => [ qw(bin/github.pl) ],
   (eval { ExtUtils::MakeMaker->VERSION(6.21) } ? (LICENSE => 'perl') : ()),
   PREREQ_PM    => {
