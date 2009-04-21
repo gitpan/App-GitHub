@@ -10,9 +10,8 @@ use Net::GitHub;
 use Term::ReadLine;
 use JSON::XS;
 
-our $VERSION = '0.06';
+our $VERSION = '0.07';
 
-# Copied from Devel-REPL
 has 'term' => (
     is       => 'rw',
     required => 1,
@@ -28,15 +27,20 @@ has 'out_fh' => (
     is       => 'rw',
     required => 1,
     lazy     => 1,
-    default  => sub { shift->term->OUT || \*STDOUT; }
+    default  => sub {
+        shift->term->OUT || \*STDOUT;
+    }
 );
 
 sub print {
     my ( $self, @ret ) = @_;
-    my $fh = $self->out_fh;
+
+    #my $fh = $self->out_fh;
+    open my $fh, '|-', 'more' or die "unable to open more: $!";
     no warnings 'uninitialized';
     print $fh "@ret";
     print $fh "\n" if $self->term->ReadLine =~ /Gnu/;
+    close($fh);
 }
 
 sub read {
@@ -111,6 +115,17 @@ my $dispatch = {
     'u.pub_keys'     => sub { shift->user_pub_keys('show'); },
     'u.pub_keys.add' => sub { shift->user_pub_keys( 'add', @_ ); },
     'u.pub_keys.del' => sub { shift->user_pub_keys( 'del', @_ ); },
+
+    # Commits
+    'c.branch' => sub { shift->run_github( 'commit', 'branch', shift ); },
+    'c.file'   => sub {
+        my ( $self, $arg ) = @_;
+        my @args = split( /\s+/, $arg, 2 );
+        @args = ( 'master', $args[0] ) if scalar @args == 1;
+        $self->run_github( 'commit', 'file', @args );
+    },
+    'c.show' => sub { shift->run_github( 'commit', 'show', shift ); },
+
 };
 
 sub run {
@@ -196,6 +211,12 @@ Users
  u.pub_keys                  Public Key Management (auth required)
  u.pub_keys.add
  u.pub_keys.del :number
+
+Commits
+ c.branch  :branch           list commits for a branch
+ c.file    :branch :file     get all the commits modified the file
+ c.file    :file             (default branch 'master')
+ c.show    :sha1             show a specific commit
 
 Others
  r.show    :user :repo       more in-depth information for a repository
@@ -456,6 +477,8 @@ sub user_pub_keys {
     }
 }
 
+#################### Commits;
+
 1;
 __END__
 
@@ -465,7 +488,7 @@ App::GitHub - GitHub Command Tools
 
 =head1 VERSION
 
-version 0.06
+version 0.07
 
 =head1 SYNOPSIS
 

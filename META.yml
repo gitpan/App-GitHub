@@ -12,4 +12,4 @@ requires:
   Term::ReadLine: 0
 resources: 
   repository: http://github.com/fayland/perl-app-github/tree
-version: 0.06
+version: 0.07
