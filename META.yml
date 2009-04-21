@@ -8,8 +8,8 @@ name: App-GitHub
 requires: 
   JSON::XS: 2.232
   Moose: 0
-  Net::GitHub: 0.09
+  Net::GitHub: 0.11
   Term::ReadLine: 0
 resources: 
-  repository: git://github.com/fayland/perl-app-github.git
-version: 0.05
+  repository: http://github.com/fayland/perl-app-github/tree
+version: 0.06
