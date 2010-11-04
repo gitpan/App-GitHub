@@ -9,8 +9,9 @@ use Moose;
 use Net::GitHub;
 use Term::ReadLine;
 use JSON::XS;
+use IPC::Cmd qw/can_run/;
 
-our $VERSION = '0.09';
+our $VERSION = '0.10';
 
 has 'term' => (
     is       => 'rw',
@@ -37,13 +38,28 @@ sub print {
 
     my $fh;
     local $@;
-    eval { open $fh, '|-', 'more' or die "unable to open more: $!"; };
+    eval {
+
+        # let less exit if one screen
+        no warnings 'uninitialized';
+        local $ENV{LESS} ||= "";
+        $ENV{LESS} .= " -F";
+        open $fh, '|-', $self->_get_pager or die "unable to open more: $!";
+    };
     $fh = $self->out_fh if $@;
 
     no warnings 'uninitialized';
     print $fh "@ret";
     print $fh "\n" if $self->term->ReadLine =~ /Gnu/;
     close($fh);
+}
+
+sub _get_pager {
+    my $pager =
+         $ENV{PAGER}
+      || can_run("less")
+      || can_run("more")
+      || die "no pager found";
 }
 
 sub read {
@@ -95,7 +111,7 @@ my $dispatch = {
         $self->run_github( 'issue', 'list', $type );
     },
     'i.view'   => sub { shift->run_github( 'issue', 'view', shift ); },
-    'r.search' => sub {
+    'i.search' => sub {
         my ( $self, $arg ) = @_;
         my @args = split( /\s+/, $arg, 2 );
         $self->run_github( 'issue', 'search', @args );
@@ -505,7 +521,10 @@ sub user_pub_keys {
 }
 
 1;
+
 __END__
+
+=pod
 
 =head1 NAME
 
@@ -513,7 +532,7 @@ App::GitHub - GitHub Command Tools
 
 =head1 VERSION
 
-version 0.09
+version 0.10
 
 =head1 SYNOPSIS
 
@@ -525,7 +544,7 @@ version 0.09
      loadcfg                     authed by git config --global github.user|token
      ?,h                         help
      q,exit,quit                 exit
-
+    
     Repos
      r.show                      more in-depth information for the :repo
      r.list                      list out all the repositories for the :user
@@ -540,7 +559,7 @@ version 0.09
      r.network                   see all the forks of the repo
      r.tags                      tags on the repo
      r.branches                  list of remote branches
-
+    
     Issues
      i.list    open|closed       see a list of issues for a project
      i.view    :number           get data on an individual issue by number
@@ -552,7 +571,7 @@ version 0.09
      i.comment :number
      i.label   add|del :num :label
                                  add/remove a label (auth required)
-
+    
     Users
      u.search  WORD              search user
      u.show                      get extended information on user
@@ -564,22 +583,22 @@ version 0.09
      u.pub_keys                  Public Key Management (auth required)
      u.pub_keys.add
      u.pub_keys.del :number
-
+    
     Commits
      c.branch  :branch           list commits for a branch
      c.file    :branch :file     get all the commits modified the file
      c.file    :file             (default branch 'master')
      c.show    :sha1             show a specific commit
-
+    
     Objects
      o.tree    :tree_sha1        get the contents of a tree by tree sha
      o.blob    :tree_sha1 :file  get the data of a blob by tree sha and path
      o.raw     :sha1             get the data of a blob (tree, file or commits)
-
+    
     Network
      n.meta                      network meta
      n.data_chunk :net_hash      network data
-
+    
     Others
      r.show    :user :repo       more in-depth information for a repository
      r.list    :user             list out all the repositories for a user
@@ -591,17 +610,19 @@ a command line tool wrap L<Net::GitHub>
 
 Repository: L<http://github.com/fayland/perl-app-github/tree/master>
 
-=head1 AUTHOR
-
-  Fayland Lam <fayland@gmail.com>
-
-=head1 COPYRIGHT AND LICENSE
-
-This software is copyright (c) 2009 by Fayland Lam.
-
-This is free software; you can redistribute it and/or modify it under
-the same terms as perl itself.
-
 =head1 SEE ALSO
 
 L<Net::GitHub>
+
+=head1 AUTHOR
+
+Fayland Lam <fayland@gmail.com>
+
+=head1 COPYRIGHT AND LICENSE
+
+This software is copyright (c) 2010 by Fayland Lam.
+
+This is free software; you can redistribute it and/or modify it under
+the same terms as the Perl 5 programming language system itself.
+
+=cut

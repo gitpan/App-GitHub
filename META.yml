@@ -1,15 +1,23 @@
---- 
-abstract: GitHub Command Tools
-author: 
-  - Fayland Lam <fayland@gmail.com>
-generated_by: Dist::Zilla::Plugin::MetaYaml version 1.006
+---
+abstract: 'GitHub Command Tools'
+author:
+  - 'Fayland Lam <fayland@gmail.com>'
+build_requires: {}
+configure_requires:
+  ExtUtils::MakeMaker: 6.31
+dynamic_config: 0
+generated_by: 'Dist::Zilla version 4.102341, CPAN::Meta::Converter version 2.102400'
 license: perl
+meta-spec:
+  url: http://module-build.sourceforge.net/META-spec-v1.4.html
+  version: 1.4
 name: App-GitHub
-requires: 
+requires:
+  IPC::Cmd: 0
   JSON::XS: 2.232
   Moose: 0
-  Net::GitHub: 0.11
+  Net::GitHub: 0.12
   Term::ReadLine: 0
-resources: 
-  repository: http://github.com/fayland/perl-app-github/tree
-version: 0.09
+resources:
+  repository: http://github.com/fayland/perl-app-github
+version: 0.10
