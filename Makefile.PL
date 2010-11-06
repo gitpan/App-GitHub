@@ -28,7 +28,7 @@ my %WriteMakefileArgs = (
     'Net::GitHub' => '0.12',
     'Term::ReadLine' => '0'
   },
-  'VERSION' => '0.10',
+  'VERSION' => '0.11',
   'test' => {
     'TESTS' => 't/*.t'
   }

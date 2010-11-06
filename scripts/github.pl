@@ -4,7 +4,7 @@ package    # hidden from PAUSE
   github;
 
 BEGIN {
-    $github::VERSION = '0.10';
+    $github::VERSION = '0.11';
 }
 
 # ABSTRACT: GitHub Command Tools
@@ -27,7 +27,7 @@ github - GitHub Command Tools
 
 =head1 VERSION
 
-version 0.10
+version 0.11
 
 =head1 AUTHOR
 

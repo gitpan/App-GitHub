@@ -7,6 +7,6 @@ README
 dist.ini
 lib/App/GitHub.pm
 scripts/github.pl
-t/00-compile.t
+t/00-load.t
 t/release-pod-coverage.t
 t/release-pod-syntax.t
