@@ -4,33 +4,34 @@ use warnings;
 
 
 
-use ExtUtils::MakeMaker 6.31;
+use ExtUtils::MakeMaker 6.30;
 
 
 
 my %WriteMakefileArgs = (
-  'ABSTRACT' => 'GitHub Command Tools',
-  'AUTHOR' => 'Fayland Lam <fayland@gmail.com>',
-  'BUILD_REQUIRES' => {},
-  'CONFIGURE_REQUIRES' => {
-    'ExtUtils::MakeMaker' => '6.31'
+  "ABSTRACT" => "GitHub Command Tools",
+  "AUTHOR" => "Fayland Lam <fayland\@gmail.com>, William Orr <will\@worrbase.com>",
+  "BUILD_REQUIRES" => {},
+  "CONFIGURE_REQUIRES" => {
+    "ExtUtils::MakeMaker" => "6.30"
   },
-  'DISTNAME' => 'App-GitHub',
-  'EXE_FILES' => [
-    'scripts/github.pl'
+  "DISTNAME" => "App-GitHub",
+  "EXE_FILES" => [
+    "scripts/github.pl"
   ],
-  'LICENSE' => 'perl',
-  'NAME' => 'App::GitHub',
-  'PREREQ_PM' => {
-    'IPC::Cmd' => '0',
-    'JSON::XS' => '2.232',
-    'Moose' => '0',
-    'Net::GitHub' => '0.12',
-    'Term::ReadLine' => '0'
+  "LICENSE" => "perl",
+  "NAME" => "App::GitHub",
+  "PREREQ_PM" => {
+    "IPC::Cmd" => 0,
+    "JSON::XS" => "2.232",
+    "Moose" => 0,
+    "Net::GitHub" => "0.12",
+    "Term::ReadKey" => 0,
+    "Term::ReadLine" => 0
   },
-  'VERSION' => '0.11',
-  'test' => {
-    'TESTS' => 't/*.t'
+  "VERSION" => "0.12",
+  "test" => {
+    "TESTS" => "t/*.t"
   }
 );
 

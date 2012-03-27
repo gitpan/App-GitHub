@@ -7,11 +7,12 @@ use warnings;
 
 use Moose;
 use Net::GitHub;
+use Term::ReadKey;
 use Term::ReadLine;
 use JSON::XS;
 use IPC::Cmd qw/can_run/;
 
-our $VERSION = '0.10';
+our $VERSION = '0.12';
 
 has 'term' => (
     is       => 'rw',
@@ -34,24 +35,35 @@ has 'out_fh' => (
 );
 
 sub print {
-    my ( $self, @ret ) = @_;
+    my ( $self, $message ) = @_;
 
     my $fh;
     local $@;
-    eval {
+    my $rows         = ( GetTerminalSize( $self->out_fh ) )[1];
+    my $message_rows = $message =~ tr/\n/\n/;
+    my $pager_use    = 0;
 
-        # let less exit if one screen
-        no warnings 'uninitialized';
-        local $ENV{LESS} ||= "";
-        $ENV{LESS} .= " -F";
-        open $fh, '|-', $self->_get_pager or die "unable to open more: $!";
-    };
-    $fh = $self->out_fh if $@;
+    # let less exit if one screen
+    no warnings 'uninitialized';
+    local $ENV{LESS} ||= "";
+    $ENV{LESS} .= " -F";
+    use warnings;
+
+    if ( $@ or $message_rows < $rows ) {
+        $fh = $self->out_fh;
+    }
+    else {
+        eval {
+            open $fh, '|-', $self->_get_pager or die "unable to open more: $!";
+        }
+          or $fh = $self->out_fh;
+        $pager_use = 1;
+    }
 
     no warnings 'uninitialized';
-    print $fh "@ret";
+    print $fh "$message";
     print $fh "\n" if $self->term->ReadLine =~ /Gnu/;
-    close($fh);
+    close($fh) if $pager_use;
 }
 
 sub _get_pager {
@@ -164,11 +176,11 @@ sub run {
     my $self = shift;
 
     $self->print(<<START);
-
 Welcome to GitHub Command Tools! (Ver: $VERSION)
 Type '?' or 'h' for help.
 START
 
+    $self->set_loadcfg(1);
     while ( defined( my $command = $self->read ) ) {
 
         $command =~ s/(^\s+|\s+$)//g;
@@ -309,18 +321,18 @@ sub set_login {
 }
 
 sub set_loadcfg {
-    my ($self) = @_;
+    my ( $self, $ign ) = @_;
 
     my $login = `git config --global github.user`;
     my $token = `git config --global github.token`;
     chomp($login);
     chomp($token);
-    unless ( $login and $token ) {
+    unless ( ( $login and $token ) or $ign ) {
         $self->print("run git config --global github.user|token fails");
         return;
     }
 
-    $self->_do_login( $login, $token );
+    $self->_do_login( $login, $token ) if $login and $token;
 }
 
 sub _do_login {
@@ -330,12 +342,22 @@ sub _do_login {
     $self->{_data}->{login} = $login;
     $self->{_data}->{token} = $token;
 
-    if ( $self->github ) {
+    if ( $self->{_data}->{repo} ) {
         $self->{github} = Net::GitHub->new(
             owner => $self->{_data}->{owner},
             repo  => $self->{_data}->{repo},
             login => $self->{_data}->{login},
             token => $self->{_data}->{token}
+        );
+    }
+    else {
+
+        # Create a Net::GitHub object with the owner set to the logged in user
+        # Super convenient if you don't want to set a user first
+        $self->{github} = Net::GitHub->new(
+            login => $self->{_data}->{login},
+            token => $self->{_data}->{token},
+            owner => $self->{_data}->{login}
         );
     }
 }
@@ -344,7 +366,9 @@ sub run_github {
     my ( $self, $c1, $c2 ) = @_;
 
     unless ( $self->github ) {
-        $self->print(q~unknown repo. try 'repo :owner :repo' first~);
+        $self->print(
+            q~not enough information. try calling login :user :token or loadcfg~
+        );
         return;
     }
 
@@ -373,6 +397,17 @@ qq~authentication required.\ntry 'login :owner :token' or 'loadcfg' first\n~
     }
 }
 
+sub run_github_with_repo {
+    my ($self) = shift;
+
+    unless ( $self->{_data}->{repo} ) {
+        $self->print(q~no repo specified. try calling repo :owner :repo~);
+        return;
+    }
+
+    $self->run_github(@_);
+}
+
 ################## Repos
 sub repo_show {
     my ( $self, $args ) = @_;
@@ -380,7 +415,7 @@ sub repo_show {
         $self->run_github( 'repos', 'show', $1, $2 );
     }
     else {
-        $self->run_github( 'repos', 'show' );
+        $self->run_github_with_repo( 'repos', 'show' );
     }
 }
 
@@ -417,7 +452,7 @@ sub repo_del {
     my $data = $self->read('Are you sure to delete the repo? [YN]? ');
     if ( $data eq 'Y' ) {
         $self->print("Deleting Repos ...");
-        $self->run_github( 'repos', 'delete', { confirm => 1 } );
+        $self->run_github_with_repo( 'repos', 'delete', { confirm => 1 } );
     }
 }
 
@@ -439,10 +474,10 @@ sub issue_open_or_edit {
     }
 
     if ( $type eq 'edit' ) {
-        $self->run_github( 'issue', 'edit', $number, $title, $body );
+        $self->run_github_with_repo( 'issue', 'edit', $number, $title, $body );
     }
     else {
-        $self->run_github( 'issue', 'open', $title, $body );
+        $self->run_github_with_repo( 'issue', 'open', $title, $body );
     }
 }
 
@@ -452,10 +487,10 @@ sub issue_label {
     no warnings 'uninitialized';
     my ( $type, $number, $label ) = split( /\s+/, $args, 3 );
     if ( $type eq 'add' ) {
-        $self->run_github( 'issue', 'add_label', $number, $label );
+        $self->run_github_with_repo( 'issue', 'add_label', $number, $label );
     }
     elsif ( $type eq 'del' ) {
-        $self->run_github( 'issue', 'remove_label', $number, $label );
+        $self->run_github_with_repo( 'issue', 'remove_label', $number, $label );
     }
     else {
         $self->print('unknown argument. i.label add|del :number :label');
@@ -477,7 +512,7 @@ sub issue_comment {
         $body .= "\n" . $data;
     }
 
-    $self->run_github( 'issue', 'comment', $number, $body );
+    $self->run_github_with_repo( 'issue', 'comment', $number, $body );
 }
 
 ################## Users
@@ -532,7 +567,7 @@ App::GitHub - GitHub Command Tools
 
 =head1 VERSION
 
-version 0.11
+version 0.12
 
 =head1 SYNOPSIS
 
@@ -606,21 +641,31 @@ version 0.11
 
 =head1 DESCRIPTION
 
-a command line tool wrap L<Net::GitHub>
+A command-line wrapper for L<Net::GitHub>
 
-Repository: L<http://github.com/fayland/perl-app-github/tree/master>
+Repository: L<http://github.com/worr/perl-app-github/tree/master>
 
 =head1 SEE ALSO
 
 L<Net::GitHub>
 
-=head1 AUTHOR
+=head1 AUTHORS
+
+=over 4
+
+=item *
 
 Fayland Lam <fayland@gmail.com>
 
+=item *
+
+William Orr <will@worrbase.com>
+
+=back
+
 =head1 COPYRIGHT AND LICENSE
 
-This software is copyright (c) 2010 by Fayland Lam.
+This software is copyright (c) 2012 by Fayland Lam.
 
 This is free software; you can redistribute it and/or modify it under
 the same terms as the Perl 5 programming language system itself.
