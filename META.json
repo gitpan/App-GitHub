@@ -5,7 +5,7 @@
       "William Orr <will@worrbase.com>"
    ],
    "dynamic_config" : 0,
-   "generated_by" : "Dist::Zilla version 4.300010, CPAN::Meta::Converter version 2.120630",
+   "generated_by" : "Dist::Zilla version 4.300013, CPAN::Meta::Converter version 2.120630",
    "license" : [
       "perl_5"
    ],
@@ -25,7 +25,7 @@
             "IPC::Cmd" : "0",
             "JSON::XS" : "2.232",
             "Moose" : "0",
-            "Net::GitHub" : "0.12",
+            "Net::GitHub" : "0.43_02",
             "Term::ReadKey" : "0",
             "Term::ReadLine" : "0"
          }
@@ -39,6 +39,6 @@
          "web" : "http://github.com/worr/perl-app-github"
       }
    },
-   "version" : "0.12"
+   "version" : "0.13"
 }
 
