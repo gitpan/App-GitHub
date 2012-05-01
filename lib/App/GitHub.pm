@@ -5,6 +5,7 @@ use warnings;
 
 # ABSTRACT: GitHub Command Tools
 
+use Carp;
 use Moose;
 use Net::GitHub;
 use Term::ReadKey;
@@ -12,7 +13,7 @@ use Term::ReadLine;
 use JSON::XS;
 use IPC::Cmd qw/can_run/;
 
-our $VERSION = '0.13';
+our $VERSION = '1.0';
 
 has 'term' => (
     is       => 'rw',
@@ -41,8 +42,20 @@ has 'repo_regexp' => (
     default  => sub { qr/^([\-\w]+)[\/\\\s]([\-\w]+)$/ }
 );
 
+# For non-interactive mode
+has 'silent' => (
+    is       => 'rw',
+    required => 1,
+    default  => 0,
+);
+
+sub print_err {
+    shift->print( @_, 1 );
+}
+
 sub print {
-    my ( $self, $message ) = @_;
+    my ( $self, $message, $error ) = @_;
+    return 1 if $self->silent and not $error;
 
     my $fh;
     local $@;
@@ -64,7 +77,8 @@ sub print {
     }
     else {
         eval {
-            open $fh, '|-', $self->_get_pager or die "unable to open more: $!";
+            open $fh, '|-', $self->_get_pager
+              or croak "unable to open more: $!";
         }
           or $fh = $self->out_fh;
         $pager_use = 1;
@@ -81,7 +95,7 @@ sub _get_pager {
          $ENV{PAGER}
       || can_run("less")
       || can_run("more")
-      || die "no pager found";
+      || croak "no pager found";
 }
 
 sub read {
@@ -346,6 +360,7 @@ sub run_github {
     my ( $self, $c1, $c2 ) = @_;
 
     unless ( $self->github ) {
+        croak "not auth" if not $self->silent;
         $self->print(
             q~not enough information. try calling login :user :pass or loadcfg~
         );
@@ -367,12 +382,14 @@ sub run_github {
 
         # custom error
         if ( $@ =~ /login and pass are required/ ) {
+            croak "not auth" if $self->silent;
             $self->print(
 qq~authentication required.\ntry 'login :owner :pass' or 'loadcfg' first\n~
             );
         }
         else {
-            $self->print($@);
+            croak $@ if $self->silent;
+            $self->print_err($@);
         }
     }
 }
@@ -415,13 +432,19 @@ sub repo_list {
 }
 
 sub repo_create {
-    my ($self) = @_;
+    my ($self) = shift;
 
     my %data;
-    foreach my $col ( 'name', 'description', 'homepage' ) {
-        my $data = $self->read( ucfirst($col) . ': ' );
-        $data{$col} = $data;
+    unless (@_) {
+        foreach my $col ( 'name', 'description', 'homepage' ) {
+            my $data = $self->read( ucfirst($col) . ': ' );
+            $data{$col} = $data;
+        }
     }
+    else {
+        ( $data{name}, $data{description}, $data{homepage} ) = @_;
+    }
+
     unless ( length( $data{name} ) ) {
         $self->print('create repo failed. name is required');
         return;
@@ -533,15 +556,23 @@ sub user_update {
 }
 
 sub user_pub_keys {
-    my ( $self, $type, $number ) = @_;
+    my ( $self, $type, $number, $key ) = @_;
 
     if ( $type eq 'show' ) {
         $self->run_github( 'user', 'keys' );
     }
     elsif ( $type eq 'add' ) {
-        my $name = $self->read('Pub Key Name: ');
-        my $keyv = $self->read('Key: ');
-        $self->run_github( 'user', 'create_key',
+        my ( $name, $keyv );
+        unless ( $number and $key ) {
+            $name = $self->read('Pub Key Name: ');
+            $keyv = $self->read('Key: ');
+        }
+        else {
+            $name = $number;
+            $keyv = $key;
+        }
+
+        return $self->run_github( 'user', 'create_key',
             { title => $name, key => $keyv } );
     }
     elsif ( $type eq 'del' ) {
@@ -565,7 +596,7 @@ App::GitHub - GitHub Command Tools
 
 =head1 VERSION
 
-version 0.13
+version 1.0
 
 =head1 SYNOPSIS
 

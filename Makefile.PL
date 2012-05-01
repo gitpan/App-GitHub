@@ -22,14 +22,17 @@ my %WriteMakefileArgs = (
   "LICENSE" => "perl",
   "NAME" => "App::GitHub",
   "PREREQ_PM" => {
+    "Carp" => 0,
+    "Getopt::Long" => 0,
     "IPC::Cmd" => 0,
     "JSON::XS" => "2.232",
     "Moose" => 0,
-    "Net::GitHub" => "0.43_02",
+    "Net::GitHub" => "0.43",
+    "Pod::Usage" => 0,
     "Term::ReadKey" => 0,
     "Term::ReadLine" => 0
   },
-  "VERSION" => "0.13",
+  "VERSION" => "1.0",
   "test" => {
     "TESTS" => "t/*.t"
   }

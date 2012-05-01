@@ -2,7 +2,7 @@ NAME
     App::GitHub - GitHub Command Tools
 
 VERSION
-    version 0.13
+    version 1.0
 
 SYNOPSIS
         $ github.pl
