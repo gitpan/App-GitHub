@@ -32,7 +32,7 @@ my %WriteMakefileArgs = (
     "Term::ReadKey" => 0,
     "Term::ReadLine" => 0
   },
-  "VERSION" => "1.0",
+  "VERSION" => "1.0.1",
   "test" => {
     "TESTS" => "t/*.t"
   }

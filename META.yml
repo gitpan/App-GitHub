@@ -25,4 +25,4 @@ requires:
   Term::ReadLine: 0
 resources:
   repository: git://github.com/worr/perl-app-github.git
-version: 1.0
+version: 1.0.1

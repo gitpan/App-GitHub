@@ -13,7 +13,7 @@ use Term::ReadLine;
 use JSON::XS;
 use IPC::Cmd qw/can_run/;
 
-our $VERSION = '1.0';
+our $VERSION = '1.0.1';
 
 has 'term' => (
     is       => 'rw',
@@ -360,7 +360,7 @@ sub run_github {
     my ( $self, $c1, $c2 ) = @_;
 
     unless ( $self->github ) {
-        croak "not auth" if not $self->silent;
+        croak "not auth" if $self->silent;
         $self->print(
             q~not enough information. try calling login :user :pass or loadcfg~
         );
@@ -596,7 +596,7 @@ App::GitHub - GitHub Command Tools
 
 =head1 VERSION
 
-version 1.0
+version 1.0.1
 
 =head1 SYNOPSIS
 
